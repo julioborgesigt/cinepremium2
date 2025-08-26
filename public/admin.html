@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin - Produtos</title>
+  <style>
+    /* Estilos Gerais */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin-top: 20px;
+    }
+    
+    h1, h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    /* Estilização do Formulário */
+    form {
+      background: #fafafa;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+    
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    input, textarea, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+
+    /* Estilo específico para o input de arquivo */
+    input[type="file"] {
+      padding: 3px;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+      transition: background 0.3s ease-in-out;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    /* Grid de Produtos */
+    .product-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+
+    .product-card {
+      width: 250px;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      padding: 15px;
+      position: relative;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .product-card:hover {
+      transform: scale(1.03);
+    }
+
+    .product-card img {
+      max-width: 100%;
+      max-height: 120px;
+      border-radius: 5px;
+    }
+
+    .delete-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    /* Estilos do Filtro de Histórico */
+    #historySearch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      background: #fafafa;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+      margin-top: 30px;
+    }
+
+    #historySearch input, #historySearch select {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      background: #fff;
+      width: 100%;
+    }
+
+    /* Botões dentro da área de filtros */
+    #searchButton {
+      width: 100%;
+      padding: 10px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+      transition: background 0.3s ease-in-out;
+    }
+
+    #searchButton:hover {
+      background: #0056b3;
+    }
+
+    /* Estilização da Tabela */
+    #historyResults table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #historyResults th, #historyResults td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+
+    #historyResults th {
+      background: #007BFF;
+      color: white;
+      font-weight: bold;
+    }
+
+    #historyResults tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    #historyResults tr:hover {
+      background: #f1f1f1;
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+      .product-grid {
+        flex-direction: column;
+        align-items: center;
+      }
+      .product-card {
+        width: 90%;
+      }
+      #historySearch {
+        flex-direction: column;
+        gap: 10px;
+      }
+      #historySearch input, #historySearch select, #historySearch button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Admin - Gerenciar Produtos</h1>
+    <form id="productForm">
+      <label for="title">Título:</label>
+      <input type="text" id="title" required>
+      
+      <label for="price">Preço (centavos):</label>
+      <input type="number" id="price" required>
+      
+      <label for="imageFile">Imagem:</label>
+      <input type="file" id="imageFile" accept="image/*" required>
+      <input type="hidden" id="imageBase64">
+      <label for="description">Descrição:</label>
+      <textarea id="description"></textarea>
+      
+      <button type="submit">Adicionar Produto</button>
+    </form>
+    
+    <h2>Produtos Existentes</h2>
+    <div class="product-grid" id="productGrid"></div>
+
+    <h2>Histórico de Compras</h2>
+    <div id="historySearch">
+      <input type="text" id="searchNome" placeholder="Buscar por Nome">
+      <input type="text" id="searchTelefone" placeholder="Buscar por Telefone">
+      <select id="mes"></select>
+      <select id="ano"></select>
+      <button id="searchButton">Buscar</button>
+      </div>
+
+    <div id="historyResults"></div>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+    // NOVO: Listener para converter a imagem selecionada para Base64
+    document.getElementById('imageFile').addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Armazena o resultado no campo oculto
+                document.getElementById('imageBase64').value = e.target.result;
+            };
+            reader.readAsDataURL(file); // Inicia a leitura do arquivo
+        }
+    });
+
+    // MODIFICADO: Envia o formulário e adiciona um novo produto
+    document.getElementById('productForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const title = document.getElementById('title').value;
+      const price = document.getElementById('price').value;
+      // Pega o valor do campo oculto, que agora contém a imagem em Base64
+      const image = document.getElementById('imageBase64').value;
+      const description = document.getElementById('description').value;
+      
+      // Verifica se a imagem foi selecionada
+      if (!image) {
+        alert('Por favor, selecione uma imagem.');
+        return;
+      }
+
+      const product = { title, price, image, description };
+      
+      try {
+        const response = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(product)
+        });
+        if (!response.ok) {
+          throw new Error('Erro ao adicionar produto');
+        }
+        alert('Produto adicionado com sucesso!');
+        document.getElementById('productForm').reset();
+        document.getElementById('imageBase64').value = ''; // Limpa o campo oculto
+        loadProducts();
+      } catch (error) {
+        alert(error);
+      }
+    });
+    
+    // Carrega os produtos e exibe-os em cards
+    async function loadProducts() {
+      try {
+        const response = await fetch('/api/products');
+        const products = await response.json();
+        const grid = document.getElementById('productGrid');
+        grid.innerHTML = '';
+        products.forEach(product => {
+          const card = document.createElement('div');
+          card.className = 'product-card';
+          // Atribui o id do produto via atributo data
+          card.setAttribute('data-id', product.id);
+          card.innerHTML = `
+            <button class="delete-button" onclick="deleteProduct(${product.id})">x</button>
+            <img src="${product.image}" alt="${product.title}">
+            <h3>${product.title}</h3>
+            <p>Preço: R$${(product.price/100).toFixed(2)}</p>
+            <p>${product.description || ''}</p>
+          `;
+          grid.appendChild(card);
+        });
+        // Inicializa o Sortable para reordenar os cards
+        new Sortable(grid, {
+          animation: 150,
+          ghostClass: 'sortable-ghost',
+          delay: 1000,
+          delayOnTouchOnly: true,
+          filter: '.delete-button',
+          preventOnFilter: false,
+          onEnd: function(evt) {
+            const newOrder = [];
+            document.querySelectorAll('.product-card').forEach(card => {
+              newOrder.push(card.getAttribute('data-id'));
+            });
+            fetch('/api/products/reorder', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order: newOrder })
+            })
+            .then(response => response.json())
+            .then(data => console.log(data))
+            .catch(error => console.error(error));
+          }
+        });
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+      }
+    }
+    
+    // Função para excluir um produto
+    async function deleteProduct(productId) {
+      if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+      try {
+        const response = await fetch(`/api/products/${productId}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) {
+          throw new Error('Erro ao excluir produto');
+        }
+        alert('Produto excluído com sucesso!');
+        loadProducts();
+      } catch (error) {
+        alert(error);
+      }
+    }
+    
+    function carregarMesAno() {
+      const selectMes = document.getElementById('mes');
+      const selectAno = document.getElementById('ano');
+      const hoje = new Date();
+      const anoAtual = hoje.getFullYear();
+      const mesAtual = hoje.getMonth() + 1;
+
+      const meses = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+      ];
+      selectMes.innerHTML = meses.map((m, i) => 
+        `<option value="${i + 1}" ${i + 1 === mesAtual ? "selected" : ""}>${m}</option>`
+      ).join("");
+
+      selectAno.innerHTML = "";
+      for (let ano = 2025; ano <= anoAtual; ano++) {
+        selectAno.innerHTML += `<option value="${ano}" ${ano === anoAtual ? "selected" : ""}>${ano}</option>`;
+      }
+    }
+
+    async function loadHistory() {
+      const nome = document.getElementById('searchNome')?.value.trim() || "";
+      const telefone = document.getElementById('searchTelefone')?.value.trim() || "";
+      const mes = document.getElementById('mes').value;
+      const ano = document.getElementById('ano').value;
+
+      let url = `/api/purchase-history?mes=${mes}&ano=${ano}`;
+      if (nome) url += `&nome=${encodeURIComponent(nome)}`;
+      if (telefone) url += `&telefone=${encodeURIComponent(telefone)}`;
+
+      try {
+        const response = await fetch(url);
+        const history = await response.json();
+        const resultsDiv = document.getElementById('historyResults');
+        resultsDiv.innerHTML = '';
+
+        if (history.length === 0) {
+          resultsDiv.innerHTML = '<p>Nenhum registro encontrado.</p>';
+          return;
+        }
+
+        let html = '<table border="1" style="width:100%; text-align:left;">';
+        html += '<tr><th>Nome</th><th>Telefone</th><th>Data/Hora</th><th>Status</th></tr>';
+        history.forEach(item => {
+          html += `<tr>
+            <td>${item.nome}</td>
+            <td>${formatPhone(item.telefone)}</td>
+            <td>${new Date(item.dataTransacao).toLocaleString('pt-BR')}</td>
+            <td>${item.status}</td>
+          </tr>`;
+        });
+        html += '</table>';
+        resultsDiv.innerHTML = html;
+      } catch (error) {
+        alert('Erro ao carregar histórico: ' + error);
+      }
+    }
+
+    function formatPhone(value) {
+      value = value.replace(/\D/g, "");
+      if (value.length > 0) value = "(" + value;
+      if (value.length > 3) value = value.slice(0, 3) + ") " + value.slice(3);
+      if (value.length > 10) value = value.slice(0, 10) + "-" + value.slice(10);
+      return value;
+    }
+
+    document.getElementById('searchButton').addEventListener('click', loadHistory);
+
+    window.onload = () => {
+      loadProducts();
+      carregarMesAno();
+      loadHistory();
+    };
+  </script>
+</body>
+</html>

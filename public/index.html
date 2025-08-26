@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CinePremium Edit</title>
+  <style>
+    /* Estilos globais */
+    body {
+      background: url("/cinepremium2.png") no-repeat center center fixed;
+      background-size: cover;
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: #000;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      min-height: 1000px;
+      position: relative;
+    }
+    /* Cabeçalho normal */
+    #cabeçalho img {
+      width: 100%;
+      display: block;
+      border-radius: 10px;
+    }
+    /* Cabeçalho redondo (sobreposto) */
+    #cabeçalhoredondo {
+      position: relative;
+      left: 50%;
+      transform: translateX(-50%);
+      top: -40px; /* Ajuste conforme o efeito desejado */
+      z-index: 2;
+      text-align: center;
+    }
+    #cabeçalhoredondo img {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #fff;
+    }
+    h1, h2, h3 {
+      text-align: center;
+      color: #fff;
+    }
+    /* Grid de produtos */
+    .product-grid {
+      padding: 30px;
+      display: flex;
+      margin-top: 0px;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+    .product-card {
+      width: 200px;
+      border: 1px solid #7a7a7a;
+      border-radius: 8px;
+      background: #4e4e4e;
+      overflow: hidden;
+      text-align: center;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #fff;
+    }
+    .product-card img {
+      max-width: 100%;
+      max-height: 100px;
+      margin: auto;
+    }
+    .button {
+      display: inline-block;
+      padding: 8px 12px;
+      background: #823cd3;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .button:hover:not(:disabled) {
+      background: #872bf1;
+    }
+    /* Área de checkout */
+    .purchase-container {
+      display: none;
+      margin-top: 20px;
+      text-align: center;
+    }
+    .purchase-container input {
+      padding: 8px;
+      margin: 5px;
+      width: 80%;
+      max-width: 300px;
+    }
+    .qr-section img {
+      max-width: 200px; /* ou 200px, conforme desejado */
+      height: auto;
+      margin: auto;
+    }
+    
+    .copy-info {
+      font-size: 14px;
+      color: #fff;
+      margin-top: 10px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+    }
+    .confirmation-text {  
+      font-size: 14px;
+      color: white;
+    }
+    .status-feedback {
+      font-size: 16px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    /* Rodapé */
+    footer.footer {
+      border-top: 1px solid #444;
+      padding: 10px 0;
+      margin-top: 200px;
+      color: #fff;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    footer.footer .email-icon {
+      display: inline-block;
+      vertical-align: middle;
+    }
+    footer.footer .email-icon svg {
+      width: 16px;
+      height: 16px;
+      fill: #fff;
+    }
+    /* Estilização para a página de agradecimento */
+    .thank-you-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .thank-you-card {
+      background-color: #1c1c1c;
+      border-radius: 8px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+    
+    .check-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+    }
+    .check-icon svg {
+      width: 100%;
+      height: 100%;
+      fill: #4CAF50;
+    }
+    .thank-you-card h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    .thank-you-card p {
+      margin: 5px 0;
+      font-size: 16px;
+      line-height: 1.4;
+      color: #fff; /* Texto branco */
+    }
+    .transaction-id {
+      color: #4CAF50;
+      font-weight: bold;
+      word-wrap: break-word;
+    }
+    .thank-you-card .button {
+      margin-top: 20px;
+      background-color: #4CAF50;
+      color: #fff;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.3s;
+    }
+    .thank-you-card .button:hover {
+      background-color: #43a047;
+    }
+
+    .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #ff5252; /* Vermelho ou outra cor de erro */
+    color: #fff;
+    padding: 15px 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    max-width: 90%;
+    word-wrap: break-word;
+    }
+    .toast.show {
+      opacity: 1;
+    }
+
+
+    /* Responsividade para dispositivos móveis */
+    @media (max-width: 900px) {
+      #cabeçalhoredondo img {
+        width: 90px;
+        height: 90px;
+      }
+    }
+    @media (max-width: 768px) {
+      #cabeçalhoredondo img {
+        width: 80px;
+        height: 80px;
+      }
+    }
+    @media (max-width: 600px) {
+      body {
+        margin: 10px;
+      }
+      .container {
+        padding: 10px;
+        min-height: auto;
+      }
+      #cabeçalhoredondo {
+        top: -10px;
+      }
+      #cabeçalhoredondo img {
+        width: 60px;
+        height: 60px;
+      }
+      .product-grid {
+        padding: 10px;
+        gap: 10px;
+        flex-direction: column;
+        align-items: center;
+      }
+      .product-card {
+        width: 90%;
+        max-width: 300px;
+      }
+      .purchase-container input {
+        width: 90%;
+      }
+      footer.footer {
+        flex-direction: column;
+        text-align: center;
+        margin-top: 100px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="mainContainer">
+    <div id="cabeçalho">  
+      <img src="/CInePremium1.png" alt="Imagem de Cabeçalho">
+    </div>
+    <div id="cabeçalhoredondo">
+      <img src="/cinepremiumredondo.png" alt="Imagem Redonda">
+    </div>
+    <div id="productGrid" class="product-grid">
+      </div>
+    <div id="purchaseContainer" class="purchase-container">
+      <h1>Detalhes da Compra</h1>
+      <h2><p id="productInfo"></p></h2>
+      <input type="text" id="nome" placeholder="Digite seu nome completo">
+      <input type="tel" id="telefone" placeholder="Digite seu telefone (DDD + número)">
+      <input type="text" id="cpf" placeholder="Digite seu CPF (apenas números)">
+      <input type="email" id="email" placeholder="Digite seu e-mail">
+      <br>
+      <button id="generateBtn" class="button" disabled>Gerar QR Code</button>
+      <div id="qrDisplay" class="qr-section" style="display: none;">
+        <h3>Pagamento via QR Code</h3>
+        <div id="qrCodeImg"></div>
+        <p id="qrCodeText" class="copy-info"></p>
+        <p id="transactionId" class="copy-info"></p>
+        <p id="paymentStatus" class="status-feedback"></p>
+        <button id="copyBtn" class="button">Copiar Código</button>
+      </div>
+      <button id="backBtn" class="button" style="margin-top:15px;">Voltar aos Produtos</button>
+    </div>
+    <footer class="footer">
+      <span>&copy; 2025 - Todos os direitos reservados</span>
+      <span class="email-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M0 0h24v24H0z" fill="none"/>
+          <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+        </svg>
+      </span>
+      <span>cinepremium.sac@gmail.com</span>
+    </footer>
+  </div>
+  
+  <script>
+    let selectedProduct = null;
+    let transactionId = null;
+    let pollingInterval = null;
+    
+    // Valida se o email tem um formato básico
+    function isValidEmail(email) {
+      const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+      return re.test(String(email).toLowerCase());
+    }
+
+    // Habilita o botão "Gerar QR Code" se os campos estiverem preenchidos
+    function validateCheckoutFields() {
+      const nome = document.getElementById('nome').value.trim();
+      const telefoneDigits = document.getElementById('telefone').value.replace(/\D/g, "");
+      const cpfDigits = document.getElementById('cpf').value.replace(/\D/g, "");
+      const email = document.getElementById('email').value.trim();
+      
+      document.getElementById('generateBtn').disabled = !(nome && telefoneDigits.length === 11 && cpfDigits.length === 11 && isValidEmail(email));
+    }
+    
+    // Carrega os produtos do endpoint /api/products
+    async function loadProducts() {
+      try {
+        const response = await fetch('/api/products');
+        const products = await response.json();
+        const grid = document.getElementById('productGrid');
+        grid.innerHTML = '';
+        products.forEach(product => {
+          const card = document.createElement('div');
+          card.className = 'product-card';
+          card.innerHTML = `
+            <img src="${product.image}" alt="${product.title}">
+            <h3>${product.title}</h3>
+            <p>R$ ${(product.price/100).toFixed(2)}</p>
+            <button class="button" onclick="selectProduct(${product.id})">Comprar</button>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+      }
+    }
+    
+    // Seleciona um produto e inicia o fluxo de checkout
+    async function selectProduct(productId) {
+      try {
+        const response = await fetch('/api/products');
+        const products = await response.json();
+        selectedProduct = products.find(p => p.id == productId);
+        if (!selectedProduct) {
+          alert('Produto não encontrado');
+          return;
+        }
+        document.getElementById('productInfo').textContent = 
+          `${selectedProduct.title} - ${selectedProduct.description || ''} por R$ ${(selectedProduct.price/100).toFixed(2)}`;
+        document.getElementById('productGrid').style.display = 'none';
+        document.getElementById('purchaseContainer').style.display = 'block';
+        document.getElementById('qrDisplay').style.display = 'none';
+        transactionId = null;
+        if (pollingInterval) clearInterval(pollingInterval);
+        // Limpa os campos de checkout e desabilita o botão
+        document.getElementById('nome').value = '';
+        document.getElementById('telefone').value = '';
+        document.getElementById('cpf').value = '';
+        document.getElementById('email').value = '';
+        validateCheckoutFields();
+      } catch (error) {
+        alert('Erro ao selecionar produto: ' + error);
+      }
+    }
+    
+    // Botão para voltar ao grid de produtos
+    document.getElementById('backBtn').addEventListener('click', function() {
+      document.getElementById('purchaseContainer').style.display = 'none';
+      document.getElementById('productGrid').style.display = 'flex';
+      if (pollingInterval) clearInterval(pollingInterval);
+    });
+    
+    // Verifica o status do pagamento periodicamente
+    function checkPaymentStatus() {
+      if (!transactionId) return;
+      fetch('/check-local-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: transactionId })
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Erro ao verificar status');
+        return response.json();
+      })
+      .then(data => {
+        // LOG ADICIONADO: Mostra a resposta do servidor no console do navegador
+        console.log('Verificando status...', data);
+
+        if (data.status && data.status.toLowerCase() === 'sucesso') {
+          // LOG ADICIONADO: Confirma que a condição para mostrar a página de sucesso foi atendida
+          console.log('Status "Sucesso" detectado! Exibindo página de agradecimento.');
+
+          document.getElementById('mainContainer').innerHTML = `
+            <div class="thank-you-container">
+              <div class="thank-you-card">
+                <div class="check-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                    <path d="M17.6 31.5L7.7 21.6l-2.8 2.8 12.7 12.7 27.7-27.7-2.8-2.8Z"/>
+                  </svg>
+                </div>
+                <h1>Obrigado pela sua compra!</h1>
+                <p>Sua transação foi confirmada.</p>
+                <p>ID da Transação: <span class="transaction-id">${transactionId}</span></p>
+                <button class="button" onclick="window.location.href='/'">Voltar à Página Inicial</button>
+              </div>
+            </div>
+          `;
+          clearInterval(pollingInterval);
+        } else {
+          document.getElementById('paymentStatus').textContent = 'Aguardando confirmação do pagamento...';
+        }
+      })
+      .catch(error => {
+        console.error('Erro ao verificar status:', error);
+      });
+    }
+    
+    // Gera o QR Code de pagamento, enviando também os dados do cliente
+    document.getElementById('generateBtn').addEventListener('click', function() {
+      if (!selectedProduct) return;
+      const nome = document.getElementById('nome').value.trim();
+      const telefone = document.getElementById('telefone').value.trim();
+      const cpf = document.getElementById('cpf').value.trim();
+      const email = document.getElementById('email').value.trim();
+
+      fetch('/gerarqrcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          value: selectedProduct.price, 
+          nome, 
+          telefone,
+          cpf,
+          email,
+          productTitle: selectedProduct.title,
+          productDescription: selectedProduct.description || ''
+        })
+      })
+      .then(async response => {
+        if (!response.ok) {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || (errorData.msg && Object.values(errorData.msg)[0]) || 'Ocorreu um erro desconhecido.';
+          throw new Error(errorMessage);
+        }
+        return response.json();
+      })
+      .then(data => {
+        document.getElementById('qrDisplay').style.display = 'block';
+        document.getElementById('nome').style.display = 'none';
+        document.getElementById('telefone').style.display = 'none';
+        document.getElementById('cpf').style.display = 'none';
+        document.getElementById('email').style.display = 'none';
+        document.getElementById('generateBtn').style.display = 'none';
+        
+        // CORREÇÃO AQUI: Adicionar o prefixo para Base64
+        document.getElementById('qrCodeImg').innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" alt="QR Code de Pagamento" style="width:200px; height:200px;">`;
+        document.getElementById('qrCodeText').textContent = data.qr_code;
+        transactionId = data.id;
+        document.getElementById('transactionId').textContent = 'ID da Transação: ' + transactionId;
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = setInterval(checkPaymentStatus, 5000);
+      })
+      .catch(error => {
+        showErrorToast(error.message);
+      });
+    });
+    
+    document.getElementById('copyBtn').addEventListener('click', function() {
+      const qrCodeText = document.getElementById('qrCodeText').textContent;
+      navigator.clipboard.writeText(qrCodeText)
+        .then(() => alert('Código copiado para a área de transferência!'))
+        .catch(err => alert('Erro ao copiar: ' + err));
+    });
+    
+    window.onload = loadProducts;
+    
+    function formatPhone(value) {
+      value = value.replace(/\D/g, "").substring(0, 11);
+      if (value.length > 0) value = "(" + value;
+      if (value.length > 3) value = value.slice(0, 3) + ") " + value.slice(3);
+      if (value.length > 10) value = value.slice(0, 10) + "-" + value.slice(10);
+      return value;
+    }
+
+    function formatCPF(value) {
+      value = value.replace(/\D/g, "").substring(0, 11);
+      if (value.length > 3) value = value.slice(0, 3) + "." + value.slice(3);
+      if (value.length > 7) value = value.slice(0, 7) + "." + value.slice(7);
+      if (value.length > 11) value = value.slice(0, 11) + "-" + value.slice(11);
+      return value;
+    }
+    
+    document.getElementById('telefone').addEventListener('input', validateCheckoutFields);
+    document.getElementById('cpf').addEventListener('input', validateCheckoutFields);
+    document.getElementById('email').addEventListener('input', validateCheckoutFields);
+    document.getElementById('nome').addEventListener('input', validateCheckoutFields);
+
+    function showErrorToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      void toast.offsetWidth;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+          document.body.removeChild(toast);
+        }, 500);
+      }, 4000);
+    }
+  </script>
+</body>
+</html>
