@@ -227,6 +227,28 @@
       opacity: 1;
     }
 
+    /* NOVO: Estilos para o Loading Spinner */
+    .loading-spinner {
+      display: none; /* Escondido por padrão */
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3; /* Light grey */
+      border-top: 4px solid #823cd3; /* Blue */
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 20px auto; /* Centraliza horizontalmente e adiciona espaço */
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* NOVO: Classe para desabilitar visualmente o botão enquanto carrega */
+    .button.loading {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
 
     /* Responsividade para dispositivos móveis */
     @media (max-width: 900px) {
@@ -296,6 +318,7 @@
       <input type="email" id="email" placeholder="Digite seu e-mail">
       <br>
       <button id="generateBtn" class="button" disabled>Gerar QR Code</button>
+      <div id="loadingSpinner" class="loading-spinner"></div> 
       <div id="qrDisplay" class="qr-section" style="display: none;">
         <h3>Pagamento via QR Code</h3>
         <div id="qrCodeImg"></div>
@@ -410,13 +433,8 @@
         return response.json();
       })
       .then(data => {
-        // LOG ADICIONADO: Mostra a resposta do servidor no console do navegador
-        console.log('Verificando status...', data);
-
         if (data.status && data.status.toLowerCase() === 'sucesso') {
-          // LOG ADICIONADO: Confirma que a condição para mostrar a página de sucesso foi atendida
-          console.log('Status "Sucesso" detectado! Exibindo página de agradecimento.');
-
+          // Substitui o conteúdo atual pela página de agradecimento estilizada
           document.getElementById('mainContainer').innerHTML = `
             <div class="thank-you-container">
               <div class="thank-you-card">
@@ -443,35 +461,41 @@
     }
     
     // Gera o QR Code de pagamento, enviando também os dados do cliente
-    document.getElementById('generateBtn').addEventListener('click', function() {
+    document.getElementById('generateBtn').addEventListener('click', async function() { // NOVO: Adicionado 'async' aqui
       if (!selectedProduct) return;
+      
       const nome = document.getElementById('nome').value.trim();
       const telefone = document.getElementById('telefone').value.trim();
       const cpf = document.getElementById('cpf').value.trim();
       const email = document.getElementById('email').value.trim();
 
-      fetch('/gerarqrcode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          value: selectedProduct.price, 
-          nome, 
-          telefone,
-          cpf,
-          email,
-          productTitle: selectedProduct.title,
-          productDescription: selectedProduct.description || ''
-        })
-      })
-      .then(async response => {
+      // NOVO: Mostrar o spinner e desabilitar o botão
+      document.getElementById('loadingSpinner').style.display = 'block';
+      this.disabled = true; // Desabilita o próprio botão "Gerar QR Code"
+      this.classList.add('loading'); // Adiciona classe visual de loading
+
+      try { // NOVO: Adicionado bloco try...catch para gerenciar o spinner em caso de erro
+        const response = await fetch('/gerarqrcode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            value: selectedProduct.price, 
+            nome, 
+            telefone,
+            cpf,
+            email,
+            productTitle: selectedProduct.title,
+            productDescription: selectedProduct.description || ''
+          })
+        });
+
         if (!response.ok) {
           const errorData = await response.json();
           const errorMessage = errorData.error || (errorData.msg && Object.values(errorData.msg)[0]) || 'Ocorreu um erro desconhecido.';
           throw new Error(errorMessage);
         }
-        return response.json();
-      })
-      .then(data => {
+        const data = await response.json(); // NOVO: Usar 'await' aqui
+        
         document.getElementById('qrDisplay').style.display = 'block';
         document.getElementById('nome').style.display = 'none';
         document.getElementById('telefone').style.display = 'none';
@@ -486,10 +510,14 @@
         document.getElementById('transactionId').textContent = 'ID da Transação: ' + transactionId;
         if (pollingInterval) clearInterval(pollingInterval);
         pollingInterval = setInterval(checkPaymentStatus, 5000);
-      })
-      .catch(error => {
+
+      } catch (error) {
         showErrorToast(error.message);
-      });
+      } finally { // NOVO: O bloco 'finally' sempre executa, garantindo que o spinner seja escondido
+        document.getElementById('loadingSpinner').style.display = 'none';
+        this.disabled = false; // Reabilita o botão "Gerar QR Code"
+        this.classList.remove('loading'); // Remove a classe visual de loading
+      }
     });
     
     document.getElementById('copyBtn').addEventListener('click', function() {
@@ -501,6 +529,7 @@
     
     window.onload = loadProducts;
     
+    // Funções de formatação de telefone e CPF (já existentes)
     function formatPhone(value) {
       value = value.replace(/\D/g, "").substring(0, 11);
       if (value.length > 0) value = "(" + value;
@@ -521,6 +550,24 @@
     document.getElementById('cpf').addEventListener('input', validateCheckoutFields);
     document.getElementById('email').addEventListener('input', validateCheckoutFields);
     document.getElementById('nome').addEventListener('input', validateCheckoutFields);
+
+    // NOVO: Adiciona a máscara de formatação para o campo de telefone (já existente)
+    document.getElementById('telefone').addEventListener('input', function (e) {
+      let value = e.target.value;
+      value = value.replace(/\D/g, ""); // Remove tudo que não é dígito
+      value = value.substring(0, 11); // Limita a 11 dígitos
+
+      // Aplica a máscara (xx) xxxxx-xxxx dinamicamente
+      if (value.length > 6) {
+        value = value.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
+      } else if (value.length > 2) {
+        value = value.replace(/^(\d{2})(\d{0,5}).*/, '($1) $2');
+      } else if (value.length > 0) {
+        value = value.replace(/^(\d*)/, '($1');
+      }
+      
+      e.target.value = value;
+    });
 
     function showErrorToast(message) {
       const toast = document.createElement('div');
