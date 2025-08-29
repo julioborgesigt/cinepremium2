@@ -1,3 +1,6 @@
+// NOVO: Carrega as variáveis de ambiente do arquivo .env
+require('dotenv').config();
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -5,33 +8,87 @@ const axios = require('axios'); // Utilize axios para requisições HTTP
 const { Op } = require('sequelize');
 const { Product, PurchaseHistory } = require('./models');
 
+// NOVO: Dependências para gerenciar sessões e cookies
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 app.use(bodyParser.json());
+// NOVO: Adicionado para interpretar dados de formulários HTML (para o login)
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rota para a página de administração
-app.get('/admin', (req, res) => {
+// NOVO: Configuração do middleware de sessão
+app.use(cookieParser());
+app.use(session({
+  secret: process.env.SESSION_SECRET, // Chave secreta para assinar o cookie da sessão
+  resave: false,
+  saveUninitialized: true,
+  cookie: { maxAge: 8 * 60 * 60 * 1000 } // A sessão expira em 8 horas
+}));
+
+// --- SEÇÃO DE AUTENTICAÇÃO ---
+
+// NOVO: Middleware para proteger rotas. Ele verifica se o usuário está logado.
+function requireLogin(req, res, next) {
+  if (req.session.loggedin) {
+    next(); // Se a sessão existe, continua para a próxima rota
+  } else {
+    res.redirect('/login'); // Se não, redireciona para a página de login
+  }
+}
+
+// NOVO: Rota para exibir a página de login (public/login.html)
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// NOVO: Rota para validar as credenciais enviadas pelo formulário de login
+app.post('/auth', (req, res) => {
+  const { username, password } = req.body;
+  // Compara os dados do formulário com as variáveis de ambiente seguras
+  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
+    req.session.loggedin = true; // Se as credenciais estiverem corretas, cria a sessão
+    res.redirect('/admin'); // Redireciona para o painel de admin
+  } else {
+    res.redirect('/login?error=1');
+  }
+});
+
+// NOVO: Rota para fazer logout e destruir a sessão
+app.get('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.redirect('/admin'); // Se houver erro, volta para o admin
+    }
+    res.clearCookie('connect.sid'); // Limpa o cookie da sessão
+    res.redirect('/login');
+  });
+});
+
+// --- FIM DA SEÇÃO DE AUTENTICAÇÃO ---
+
+
+// MODIFICADO: A rota para a página de administração agora está protegida pelo middleware requireLogin
+app.get('/admin', requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// --- CONFIGURAÇÃO DA NOVA API DE PAGAMENTO (ONDAPAY) ---
+// --- CONFIGURAÇÃO DA API DE PAGAMENTO (ONDAPAY) ---
 const ONDAPAY_API_URL = "https://api.ondapay.app";
-const ONDAPAY_CLIENT_ID = "c62e7acd-8c6d-4056-93b7-19dd8f5fe930";
-const ONDAPAY_CLIENT_SECRET = "x6HB3VsRbnFMfsasTH2eK1HMbsExkiLM";
+// MODIFICADO: Credenciais agora vêm de variáveis de ambiente
+const ONDAPAY_CLIENT_ID = process.env.ONDAPAY_CLIENT_ID;
+const ONDAPAY_CLIENT_SECRET = process.env.ONDAPAY_CLIENT_SECRET;
 const WEBHOOK_URL = "https://cinepremiumedit.domcloud.dev/ondapay-webhook";
 
 let ondaPayToken = null;
 
 // Função para obter/renovar o token de autenticação
-async function getOndaPayToken() {
-  // AQUI, em um projeto de produção, você adicionaria uma lógica para
-  // verificar se o token expirou antes de pedir um novo.
-  // Por simplicidade, estamos pegando um novo token a cada reinicialização do servidor.
-  if (ondaPayToken) {
+// MODIFICADO: A função agora aceita um parâmetro para forçar a renovação
+async function getOndaPayToken(forceNew = false) {
+  if (ondaPayToken && !forceNew) {
     return ondaPayToken;
   }
-
   try {
     const response = await axios.post(`${ONDAPAY_API_URL}/api/v1/login`, {}, {
       headers: {
@@ -41,103 +98,91 @@ async function getOndaPayToken() {
       }
     });
     ondaPayToken = response.data.token;
-    console.log("Token da OndaPay obtido com sucesso.");
+    console.log("Token da OndaPay obtido/renovado com sucesso.");
     return ondaPayToken;
   } catch (error) {
     console.error("Erro ao obter token da OndaPay:", error.response ? error.response.data : error.message);
-    // Invalida o token em caso de erro para forçar uma nova tentativa na próxima vez
     ondaPayToken = null; 
     throw new Error("Não foi possível autenticar com o serviço de pagamento.");
   }
 }
 
+// --- ROTAS PÚBLICAS (Acessíveis sem login) ---
 
-// Endpoint para gerar QR Code de pagamento (adaptado para OndaPay)
+// Endpoint para gerar QR Code de pagamento
+// MODIFICADO: A rota de gerar QR Code agora tem a lógica de renovação de token
 app.post('/gerarqrcode', async (req, res) => {
   try {
-    // 1. RECEBE O NOVO CAMPO 'email'
     const { value, nome, telefone, cpf, email, productTitle, productDescription } = req.body;
     if (!value || !nome || !telefone || !cpf || !email) {
       return res.status(400).json({ error: "Todos os campos, incluindo e-mail, são obrigatórios." });
     }
     
-    // A lógica de prevenção de tentativas múltiplas permanece a mesma
+    // ... (lógica de verificação de tentativas de compra inalterada) ...
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const attemptsLastHour = await PurchaseHistory.count({
-      where: {
-        telefone,
-        dataTransacao: { [Op.gte]: oneHourAgo }
-      }
-    });
-    
-    const attemptsLastMonth = await PurchaseHistory.count({
-      where: {
-        telefone,
-        dataTransacao: { [Op.gte]: oneMonthAgo }
-      }
-    });
-    
+    const attemptsLastHour = await PurchaseHistory.count({ where: { telefone, dataTransacao: { [Op.gte]: oneHourAgo } } });
+    const attemptsLastMonth = await PurchaseHistory.count({ where: { telefone, dataTransacao: { [Op.gte]: oneMonthAgo } } });
     if (attemptsLastHour >= 3 || attemptsLastMonth >= 5) {
-      return res.status(429).json({ 
-        error: 'Você já tentei pagar muitas vezes, procure seu vendedor ou tente novamente depois de algumas horas'
-      });
+      return res.status(429).json({ error: 'Você já tentei pagar muitas vezes, procure seu vendedor ou tente novamente depois de algumas horas' });
     }
-
-    const token = await getOndaPayToken();
     
-    // Cria um registro inicial no histórico para gerar um external_id
     const purchaseRecord = await PurchaseHistory.create({ nome, telefone, status: 'Gerado' });
-
-    // >>>>> ALTERAÇÃO AQUI: Adicionando dueDate <<<<<
     const expirationDate = new Date();
-    expirationDate.setMinutes(expirationDate.getMinutes() + 30); // Define a validade para 30 minutos a partir de agora
-
+    expirationDate.setMinutes(expirationDate.getMinutes() + 30);
     const pad = (num) => String(num).padStart(2, '0');
-    // Formata a data para 'AAAA-MM-DD HH:MM:SS'
     const dueDateFormatted = `${expirationDate.getFullYear()}-${pad(expirationDate.getMonth() + 1)}-${pad(expirationDate.getDate())} ${pad(expirationDate.getHours())}:${pad(expirationDate.getMinutes())}:${pad(expirationDate.getSeconds())}`;
 
-    // >>>>> ALTERAÇÃO AQUI: Adicionando email e dueDate ao payload <<<<<
     const payload = {
-      amount: parseFloat((value / 100).toFixed(2)), // API espera um float
+      amount: parseFloat((value / 100).toFixed(2)),
       external_id: purchaseRecord.id.toString(),
       webhook: WEBHOOK_URL,
       description: `${productTitle} - ${productDescription || ''}`,
-      dueDate: dueDateFormatted, // Campo obrigatório
-      payer: {
-        name: nome,
-        document: cpf.replace(/\D/g, ''),
-        email: email // Campo obrigatório
-      }
+      dueDate: dueDateFormatted,
+      payer: { name: nome, document: cpf.replace(/\D/g, ''), email: email }
     };
     
-    const response = await axios.post(`${ONDAPAY_API_URL}/api/v1/deposit/pix`, payload, {
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
+    // NOVO: Lógica de tentativa e renovação do token
+    let token = await getOndaPayToken();
+    let response;
+    
+    try {
+      // Primeira tentativa com o token atual
+      response = await axios.post(`${ONDAPAY_API_URL}/api/v1/deposit/pix`, payload, {
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+      });
+    } catch (error) {
+      // Se a primeira tentativa falhar com erro 401 (Não Autorizado), o token provavelmente expirou
+      if (error.response && error.response.status === 401) {
+        console.log("Token da OndaPay expirado. Renovando e tentando novamente...");
+        // Força a obtenção de um novo token
+        token = await getOndaPayToken(true); 
+        // Segunda (e última) tentativa com o novo token
+        response = await axios.post(`${ONDAPAY_API_URL}/api/v1/deposit/pix`, payload, {
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+        });
+      } else {
+        // Se o erro for diferente de 401, propaga o erro para ser tratado abaixo
+        throw error;
       }
-    });
+    }
 
     const data = response.data;
-    
-    // Atualiza nosso registro no banco com o ID da transação da OndaPay
     await purchaseRecord.update({ transactionId: data.id_transaction });
     
     const resultado = {
       id: data.id_transaction,
       qr_code: data.qrcode,
-      qr_code_base64: data.qrcode_base64
+      qr_code_base64: data.qrcode_base64,
+      expirationTimestamp: expirationDate.getTime()
     };
 
     console.log("QR Code gerado (OndaPay):", resultado.id);
     res.json(resultado);
   } catch (error) {
     let errorMessage = "Erro interno ao gerar QR code.";
-    // Verifica se a resposta de erro veio da API da OndaPay
     if (error.response && error.response.data && error.response.data.msg) {
-        // Pega a primeira mensagem de erro retornada pela API
         errorMessage = Object.values(error.response.data.msg)[0];
         console.error("Erro da API OndaPay:", error.response.data);
     } else {
@@ -147,35 +192,27 @@ app.post('/gerarqrcode', async (req, res) => {
   }
 });
 
-
-// NOVO ENDPOINT: Webhook para receber confirmação de pagamento
+// Webhook para receber confirmação de pagamento
 app.post('/ondapay-webhook', async (req, res) => {
-    // LOG ADICIONADO: Mostra o corpo completo da requisição do webhook
     console.log('--- [WEBHOOK LOG] --- Webhook Recebido. Corpo da requisição:');
     console.log(JSON.stringify(req.body, null, 2));
     console.log('--- [WEBHOOK LOG] --- Fim do corpo da requisição.');
 
     try {
       const { status, transaction_id, external_id } = req.body;
-      
-      // Valida se os dados essenciais estão presentes
       if (!status || !transaction_id || !external_id) {
         console.warn(`[WEBHOOK LOG] Webhook recebido com dados incompletos.`, req.body);
         return res.status(400).send('Dados do webhook incompletos.');
       }
   
       if (status.toUpperCase() === 'PAID_OUT') {
-        // LOG ADICIONADO: Confirma que a condição de pagamento foi atendida
         console.log(`[WEBHOOK LOG] Status 'PAID_OUT' detectado para external_id: ${external_id}`);
-        
         const purchaseId = parseInt(external_id, 10);
-        
         if (isNaN(purchaseId)) {
           console.error(`[WEBHOOK LOG] Erro: external_id '${external_id}' não é um número válido.`);
           return res.status(400).send('external_id inválido.');
         }
 
-        // LOG ADICIONADO: Informa que a atualização do banco de dados será tentada
         console.log(`[WEBHOOK LOG] Tentando atualizar o registro com ID: ${purchaseId} para 'Sucesso'.`);
         const [updatedRows] = await PurchaseHistory.update(
           { status: 'Sucesso' },
@@ -188,34 +225,28 @@ app.post('/ondapay-webhook', async (req, res) => {
             console.warn(`[WEBHOOK LOG] AVISO: Nenhum registro encontrado ou atualizado para o ID de compra ${purchaseId}. Verifique se o external_id está correto.`);
         }
       } else {
-        // LOG ADICIONADO: Informa qual status foi recebido, caso não seja 'PAID_OUT'
         console.log(`[WEBHOOK LOG] Status recebido foi '${status}'. Nenhuma ação necessária.`);
       }
-      
       res.status(200).send({ status: 'ok' });
-  
     } catch (error) {
       console.error("[WEBHOOK LOG] Erro crítico no processamento do webhook:", error.message);
       res.status(500).send('Erro interno ao processar webhook.');
     }
   });
 
-
-// ENDPOINT MODIFICADO: Agora verifica o status localmente
+// Endpoint para o cliente verificar o status do pagamento
 app.post('/check-local-status', async (req, res) => {
     try {
-      const { id } = req.body; // Este é o transactionId da OndaPay
+      const { id } = req.body;
       if (!id) return res.status(400).json({ error: "ID da transação não fornecido." });
   
       const purchase = await PurchaseHistory.findOne({ where: { transactionId: id } });
   
       if (!purchase) {
-        // LOG ADICIONADO: Informa quando uma verificação de status não encontra um registro correspondente
         console.log(`[STATUS CHECK] Nenhuma compra encontrada para o transactionId: ${id}. Retornando 'Gerado'.`);
         return res.json({ id: id, status: 'Gerado' });
       }
       
-      // LOG ADICIONADO: Mostra o status que está sendo retornado para o frontend
       console.log(`[STATUS CHECK] Status para transactionId ${id} é '${purchase.status}'. Enviando para o cliente.`);
       res.json({ id: purchase.transactionId, status: purchase.status });
   
@@ -225,10 +256,21 @@ app.post('/check-local-status', async (req, res) => {
     }
 });
 
+// Endpoint público para buscar a lista de produtos
+app.get('/api/products', async (req, res) => {
+    try {
+      const products = await Product.findAll({ order: [['orderIndex', 'ASC']] });
+      res.json(products);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Erro ao buscar produtos.' });
+    }
+});
 
-// --- ENDPOINTS DE ADMINISTRAÇÃO E PRODUTOS (sem alterações) ---
+// --- ENDPOINTS DE ADMINISTRAÇÃO (Protegidos) ---
 
-app.post('/api/products', async (req, res) => {
+// MODIFICADO: Adicionado 'requireLogin' para proteger a rota
+app.post('/api/products', requireLogin, async (req, res) => {
     try {
       const { title, price, image, description } = req.body;
       if (!title || !price || !image) {
@@ -241,18 +283,9 @@ app.post('/api/products', async (req, res) => {
       res.status(500).json({ error: 'Erro ao criar produto.' });
     }
 });
-
-app.get('/api/products', async (req, res) => {
-    try {
-      const products = await Product.findAll({ order: [['orderIndex', 'ASC']] });
-      res.json(products);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: 'Erro ao buscar produtos.' });
-    }
-});
   
-app.put('/api/products/reorder', async (req, res) => {
+// MODIFICADO: Adicionado 'requireLogin' para proteger a rota
+app.put('/api/products/reorder', requireLogin, async (req, res) => {
     try {
       const { order } = req.body;
       if (!order || !Array.isArray(order)) {
@@ -262,13 +295,14 @@ app.put('/api/products/reorder', async (req, res) => {
         await Product.update({ orderIndex: i }, { where: { id: order[i] } });
       }
       res.json({ message: 'Ordem atualizada com sucesso.' });
-    } catch (error) {
+    } catch (error)      {
       console.error(error);
       res.status(500).json({ error: 'Erro ao atualizar a ordem dos produtos.' });
     }
 });
 
-app.delete('/api/products/:id', async (req, res) => {
+// MODIFICADO: Adicionado 'requireLogin' para proteger a rota
+app.delete('/api/products/:id', requireLogin, async (req, res) => {
     try {
       const { id } = req.params;
       const rowsDeleted = await Product.destroy({ where: { id } });
@@ -282,7 +316,8 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
-app.get('/api/purchase-history', async (req, res) => {
+// MODIFICADO: Adicionado 'requireLogin' para proteger a rota
+app.get('/api/purchase-history', requireLogin, async (req, res) => {
     try {
       const { nome, telefone, mes, ano } = req.query;
       let where = {};

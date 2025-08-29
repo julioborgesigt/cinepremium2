@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h1 { text-align: center; color: #333; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        input { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: #007BFF; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        
+        /* NOVO: Estilo para a mensagem de erro */
+        .error-message {
+            color: #D8000C; /* Vermelho */
+            background-color: #FFD2D2; /* Fundo vermelho claro */
+            border: 1px solid #D8000C;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none; /* Escondido por padrão */
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Acesso Restrito</h1>
+
+        <div id="errorMessage" class="error-message">
+            Usuário ou senha incorretos. Tente novamente.
+        </div>
+
+        <form action="/auth" method="POST">
+            <div>
+                <label for="username">Usuário:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div>
+                <label for="password">Senha:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+
+    <script>
+      window.onload = function() {
+        // Pega os parâmetros da URL
+        const params = new URLSearchParams(window.location.search);
+
+        // Verifica se o parâmetro 'error' existe
+        if (params.has('error')) {
+          // Se existir, encontra o elemento da mensagem e o torna visível
+          const errorMessageDiv = document.getElementById('errorMessage');
+          errorMessageDiv.style.display = 'block';
+        }
+      };
+    </script>
+
+</body>
+</html>

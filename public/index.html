@@ -227,6 +227,14 @@
       opacity: 1;
     }
 
+    /* NOVO: Estilos para feedback de validação nos inputs */
+    .input-valid {
+      border: 2px solid #28a745 !important; /* Borda verde */
+    }
+    .input-invalid {
+      border: 2px solid #dc3545 !important; /* Borda vermelha */
+    }
+
     /* NOVO: Estilos para o Loading Spinner */
     .loading-spinner {
       display: none; /* Escondido por padrão */
@@ -345,7 +353,48 @@
     let selectedProduct = null;
     let transactionId = null;
     let pollingInterval = null;
+    let qrCodeExpirationTimestamp = null; // NOVO: Variável para guardar o tempo de expiração
     
+    // NOVO: Função completa para validar CPF
+    function isValidCPF(cpf) {
+      if (typeof cpf !== 'string') return false;
+      cpf = cpf.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
+
+      if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) {
+        return false; // Verifica se tem 11 dígitos ou se são todos repetidos
+      }
+
+      let sum = 0;
+      let remainder;
+
+      // Validação do primeiro dígito verificador
+      for (let i = 1; i <= 9; i++) {
+        sum += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+      }
+      remainder = (sum * 10) % 11;
+      if ((remainder === 10) || (remainder === 11)) {
+        remainder = 0;
+      }
+      if (remainder !== parseInt(cpf.substring(9, 10))) {
+        return false;
+      }
+
+      // Validação do segundo dígito verificador
+      sum = 0;
+      for (let i = 1; i <= 10; i++) {
+        sum += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+      }
+      remainder = (sum * 10) % 11;
+      if ((remainder === 10) || (remainder === 11)) {
+        remainder = 0;
+      }
+      if (remainder !== parseInt(cpf.substring(10, 11))) {
+        return false;
+      }
+      
+      return true;
+    }
+
     // Valida se o email tem um formato básico
     function isValidEmail(email) {
       const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -356,10 +405,11 @@
     function validateCheckoutFields() {
       const nome = document.getElementById('nome').value.trim();
       const telefoneDigits = document.getElementById('telefone').value.replace(/\D/g, "");
-      const cpfDigits = document.getElementById('cpf').value.replace(/\D/g, "");
+      const cpf = document.getElementById('cpf').value;
       const email = document.getElementById('email').value.trim();
       
-      document.getElementById('generateBtn').disabled = !(nome && telefoneDigits.length === 11 && cpfDigits.length === 11 && isValidEmail(email));
+      // A condição agora chama a função isValidCPF()
+      document.getElementById('generateBtn').disabled = !(nome && telefoneDigits.length === 11 && isValidCPF(cpf) && isValidEmail(email));
     }
     
     // Carrega os produtos do endpoint /api/products
@@ -401,6 +451,7 @@
         document.getElementById('purchaseContainer').style.display = 'block';
         document.getElementById('qrDisplay').style.display = 'none';
         transactionId = null;
+        qrCodeExpirationTimestamp = null; // MODIFICADO: Reseta o timestamp ao selecionar novo produto
         if (pollingInterval) clearInterval(pollingInterval);
         // Limpa os campos de checkout e desabilita o botão
         document.getElementById('nome').value = '';
@@ -417,11 +468,18 @@
     document.getElementById('backBtn').addEventListener('click', function() {
       document.getElementById('purchaseContainer').style.display = 'none';
       document.getElementById('productGrid').style.display = 'flex';
+      qrCodeExpirationTimestamp = null; // MODIFICADO: Reseta o timestamp ao voltar
       if (pollingInterval) clearInterval(pollingInterval);
     });
-    
+    // MODIFICADO: A função agora verifica o tempo antes de fazer a requisição
     // Verifica o status do pagamento periodicamente
     function checkPaymentStatus() {
+       // NOVO: Bloco que verifica se o QR Code expirou
+      if (qrCodeExpirationTimestamp && Date.now() > qrCodeExpirationTimestamp) {
+        document.getElementById('paymentStatus').textContent = 'Seu QR Code expirou. Por favor, volte e gere um novo.';
+        clearInterval(pollingInterval); // Para a verificação
+        return; // Sai da função
+      }
       if (!transactionId) return;
       fetch('/check-local-status', {
         method: 'POST',
@@ -433,17 +491,12 @@
         return response.json();
       })
       .then(data => {
-        if (data.status && data.status.toLowerCase() === 'sucesso') {
+         if (data.status && data.status.toLowerCase() === 'sucesso') {
           // Substitui o conteúdo atual pela página de agradecimento estilizada
           document.getElementById('mainContainer').innerHTML = `
             <div class="thank-you-container">
               <div class="thank-you-card">
-                <div class="check-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                    <path d="M17.6 31.5L7.7 21.6l-2.8 2.8 12.7 12.7 27.7-27.7-2.8-2.8Z"/>
-                  </svg>
-                </div>
-                <h1>Obrigado pela sua compra!</h1>
+                 <h1>Obrigado pela sua compra!</h1>
                 <p>Sua transação foi confirmada.</p>
                 <p>ID da Transação: <span class="transaction-id">${transactionId}</span></p>
                 <button class="button" onclick="window.location.href='/'">Voltar à Página Inicial</button>
@@ -507,6 +560,7 @@
         document.getElementById('qrCodeImg').innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" alt="QR Code de Pagamento" style="width:200px; height:200px;">`;
         document.getElementById('qrCodeText').textContent = data.qr_code;
         transactionId = data.id;
+        qrCodeExpirationTimestamp = data.expirationTimestamp; // MODIFICADO: Armazena o timestamp recebido do servidor
         document.getElementById('transactionId').textContent = 'ID da Transação: ' + transactionId;
         if (pollingInterval) clearInterval(pollingInterval);
         pollingInterval = setInterval(checkPaymentStatus, 5000);
@@ -550,6 +604,37 @@
     document.getElementById('cpf').addEventListener('input', validateCheckoutFields);
     document.getElementById('email').addEventListener('input', validateCheckoutFields);
     document.getElementById('nome').addEventListener('input', validateCheckoutFields);
+
+
+    // MODIFICADO: O event listener do CPF agora também dá feedback visual
+    document.getElementById('cpf').addEventListener('input', function(e) {
+      // Primeiro, formata o CPF (adiciona pontos e traço)
+      let value = e.target.value;
+      value = value.replace(/\D/g, "").substring(0, 11);
+      if (value.length > 3) value = value.slice(0, 3) + "." + value.slice(3);
+      if (value.length > 7) value = value.slice(0, 7) + "." + value.slice(7);
+      if (value.length > 11) value = value.slice(0, 11) + "-" + value.slice(11);
+      e.target.value = value;
+      
+      // Segundo, valida e aplica o feedback visual
+      const cpfInput = e.target;
+      const cpfDigits = cpfInput.value.replace(/\D/g, "");
+
+      if (cpfDigits.length === 11) {
+        if (isValidCPF(cpfDigits)) {
+          cpfInput.classList.add('input-valid');
+          cpfInput.classList.remove('input-invalid');
+        } else {
+          cpfInput.classList.add('input-invalid');
+          cpfInput.classList.remove('input-valid');
+        }
+      } else {
+        cpfInput.classList.remove('input-valid', 'input-invalid');
+      }
+
+      // Por último, chama a validação geral dos campos
+      validateCheckoutFields();
+    });
 
     // NOVO: Adiciona a máscara de formatação para o campo de telefone (já existente)
     document.getElementById('telefone').addEventListener('input', function (e) {
